@@ -2,15 +2,18 @@ const express = require('express')
 const mongodb = require('mongodb')
 const mongoose = require('mongoose')
 const json = require('csvtojson')
-const MongoClient = require('mongodb').MongoClient
+const MongoClient = mongodb.MongoClient
 
-const url = "mongodb://localhost:27017/PerformanceMonitor"
-const db = mongoose.connect(url, { useNewUrlParser: true }).then(() => {
-        console.log("Database Connected")
+const url = "mongodb://localhost:27017/Performance"
+mongoose
+    .connect(url, { useNewUrlParser: true })
+    .then(() => {
+        console.log("Mongo DB Connected")
     })
+
 const app = express()
-
-
+app.use(express.json({limit : '50mb'}))
+app.use(express.urlencoded({limit: '50mb'}))
 const PerformanceSchema = mongoose.Schema({
         id:{type: Number},
         date:{type:Date},
@@ -19,15 +22,17 @@ const PerformanceSchema = mongoose.Schema({
         AVG:{type:Number},
         MAX:{type:Number},
         CounterName:{type: String},
-        Total:{type: Number},
-        resource_name:{type: String}
+        Total:{type: String},
+        createdAt: {type:Date, default:Date.now},
+        updatedAt: {type: Date, default:Date.now},
+        resource_name:{type: String, requires: true}
 })
 
-const PerformanceModel = mongoose.model('Performance', PerformanceSchema)
+const Performance = mongoose.model('Performance', PerformanceSchema)
 
 
 app.get('/csvtojson',(req,res)=>{
-    CSVToJSON().fromFile('performance.csv')
+    json().fromFile('performance.csv')
     .then(data => {
         res.send(data)
     }).catch(e => {
@@ -35,67 +40,65 @@ app.get('/csvtojson',(req,res)=>{
     });
 })
 
-app.post("/import",(req,res)=>{
 
-        const jsondata = req.body
-        // jsondata.forEach(async function (item) {
-        //     const performance = new Performance(item)
-        //     performance.save()
-        // })
-
-        // mongoose.Collection.insertMany(jsondata).then(resp => res.send('created')).catch(err => console.log(err))
-        PerformanceModel.insertMany(jsondata)
-        .then(resp => res.send('created'))
-            .catch(err => console.log(err))
+app.post("/import", async (req, res) => {
+    try {
+        
+        data = req.body
+        
+       data.forEach(async function (item){
+            const performance = new Performance(item)
+            await performance.save();
+       });
     
+        res.status(200).send('Data saved succesfully')
+    } catch (err) {
+        console.error(err)
+        res.status(500).send('Invalid Data')
+    }
+});
 
-        res.send('Data saved succesfully')
-})
+app.get("/analytics", async (req, res) => {
+    try {
 
-app.get("/analytics",  (req,res)=>{
+        var dateArr = req.query.date.split(',')
+        var start = new Date(dateArr[0])
+        var end = new Date(dateArr[1])
+        var metric = req.query.metric
+        var Aggr = req.query.Aggr
 
-    // query = {
-    //     metric : 'cpu',
-    //     aggr: 'p90'
-    // }
-
-
-    // const metric = req.query.metric
-    // const aggr = req.query.aggr
-    // const date = req.query.date
-
-    var dateArr  = req.query.date
-    let metric = req.query.metric
-    let Aggr = req.query.Aggr
-   
-    var data =  PerformanceModel.find({ 'CounterName':metric}).exec()
-    var data =  PerformanceModel.find({ 'CounterName':metric, 'date': {
+        var data = await Performance.find({ 'CounterName':metric, 'date': {
             $gte: dateArr[0],
            $lte: dateArr[1]
          } }).exec()
-    res.status(200).send(data)
-  
-
+    res.status(200).send(data)    
+    console.log(data)
+    } catch (err) {
+        console.error(err)
+        res.status(500).send('Invalid Data')
+    }
 })
 
-app.get("/badperformance", (req, res) => {
+app.get("/badperformance", async (req, res) => {
+    try {
 
-    
-    var dateArr  = req.query.date.split(',')
-    let metric = req.query.metric
-    let p90 = req.query.p90
-   
-    var data =  PerformanceModel.find({ 'CounterName':metric}).exec()
-    var data =  PerformanceModel.find({ 'CounterName':metric, 'date': {
-            $gte: dateArr[0],
-           $lte: dateArr[1]
-         },
-         'P90':{$gte : p90 }}).exec()
-    res.status(200).send(data)
-  
+        var dateArr = req.query.date.split(',')
+        let metric = req.query.metric
+        let p90 = req.query.p90
+
+        var data = await Performance.find({
+            'CounterName': metric, 'date': {
+                $gte: dateArr[0],
+                $lte: dateArr[1]
+            },
+            'P90': { $gte: p90 }
+        }).exec()
+        res.status(200).send(data)
+    } catch (err) {
+        console.error(err)
+        res.status(500).send('Invalid Data')
+    }
 })
-
-// PerformanceModel.find()
 
 
 

@@ -66,13 +66,29 @@ app.get("/analytics", async (req, res) => {
         var end = new Date(dateArr[1])
         var metric = req.query.metric
         var Aggr = req.query.Aggr
-
-        var data = await Performance.find({ 'CounterName':metric, 'date': {
-            $gte: dateArr[0],
-           $lte: dateArr[1]
-         } }).exec()
-    res.status(200).send(data)    
-    console.log(data)
+        //let p90 = req.query.p90
+        var filteration = [
+            {
+                $match: {
+                    
+                    "CounterName":metric,
+                     "date":{
+                        $gte: start,
+                        $lte: end
+                    }
+                }
+            },
+            {
+              $group: {
+                _id: Aggr,
+                max: { $max: '$'+Aggr}
+              }
+            }
+          ]
+        var aggregatefun = await Performance.aggregate(filteration);
+        console.log(aggregatefun)
+       
+        res.status(200).send(aggregatefun)
     } catch (err) {
         console.error(err)
         res.status(500).send('Invalid Data')

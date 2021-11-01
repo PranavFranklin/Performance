@@ -110,9 +110,9 @@ app.get("/badperformance", async (req, res) => {
             'P90': { $gte: p90 }
         }).exec()
         res.status(200).send(data)
-    } catch (err) {
+         } catch (err) {
         console.error(err)
-        res.status(500).send('Invalid Data')
+         res.status(500).send('Invalid Data')
     }
 })
 
